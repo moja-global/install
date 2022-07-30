@@ -1,0 +1,81 @@
+name: Build FLINT AppImage
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-18.04, ubuntu-20.04, ubuntu-22.04]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Clone and run the AppImage script
+        run: |
+          git clone https://github.com/ankitaS11/AppImageDataForFlint
+          cd AppImageDataForFlint
+          chmod +x ./AppImage_FLINT_Build.sh
+          ./AppImage_FLINT_Build.sh
+          mv /home/runner/tmp/FLINT/Source/build/FLINT-*.AppImage /home/runner/FLINT-${{ matrix.os }}.AppImage
+
+      - name: Cache artifacts
+        uses: actions/cache@v3
+        env:
+          cache-name: cache-appimages
+        with:
+          path: /home/runner/FLINT-${{ matrix.os }}.AppImage
+          key: ${{ matrix.os }}-appimage
+
+  test:
+    needs: build
+    strategy:
+      matrix:
+        os: [ubuntu-18.04, ubuntu-20.04, ubuntu-22.04]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/cache@v3
+        with:
+          path: /home/runner/FLINT-${{ matrix.os }}.AppImage
+          key: ${{ matrix.os }}-appimage
+          
+      - name: Test AppImages
+        run: |
+          test -f "/home/runner/FLINT-${{ matrix.os }}.AppImage"; 
+          echo "All AppImages have been built successfully."
+
+          /home/runner/FLINT-${{ matrix.os }}.AppImage --appimage-extract
+          cd squashfs-root
+          wget "https://raw.githubusercontent.com/Crystalsage/github-releases-tests/main/test-appimage-artifacts.sh"
+          chmod +x test-appimage-artifacts.sh
+          ./test-appimage-artifacts.sh
+
+
+  release:
+    needs: [build, test]
+    strategy:
+      matrix:
+        os: [ubuntu-18.04, ubuntu-20.04, ubuntu-22.04]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@master
+
+      - uses: actions/cache@v3
+        with:
+          path: /home/runner/FLINT-${{ matrix.os }}.AppImage
+          key: ${{ matrix.os }}-appimage
+
+      - name: Create release
+        uses: ncipollo/release-action@v1
+        with: 
+          allowUpdates: true
+          bodyfile: .github/release.md
+          prerelease: False
+          artifacts: "/home/runner/FLINT-*.AppImage"
+          token: ${{ secrets.GITHUB_TOKEN }}
