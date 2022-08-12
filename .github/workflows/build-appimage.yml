@@ -1,0 +1,121 @@
+# A CI pipeline to release FLINT AppImages.
+#
+# Important: Some releases use custom, static tags like "dev" and "production".
+# If any branches with exact names are created, the CI fails due to ref 
+# resolution.
+name: Build FLINT AppImage
+on:
+  push:
+    tags:
+      - 'v*'
+
+  workflow_dispatch:
+    inputs:
+      devRelease:
+        description: "Is this a dev release?"
+        default: true
+        required: true
+        type: boolean
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-20.04, ubuntu-22.04]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout the install repo
+        uses: actions/checkout@v3
+
+      - name: Run the AppImage script
+        run: |
+          chmod +x $GITHUB_WORKSPACE/appimage-scripts/AppImage_FLINT_Build.sh
+          $GITHUB_WORKSPACE/appimage-scripts/AppImage_FLINT_Build.sh
+          mv /home/runner/tmp/FLINT/Source/build/FLINT-*.AppImage /home/runner/FLINT-${{ matrix.os }}.AppImage
+
+      - name: Cache artifacts
+        uses: actions/cache@v3
+        env:
+          cache-name: cache-appimages
+        with:
+          path: /home/runner/FLINT-${{ matrix.os }}.AppImage
+          key: ${{ matrix.os }}-appimage
+
+  test:
+    needs: build
+    strategy:
+      matrix:
+        os: [ubuntu-20.04, ubuntu-22.04]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout the install repo
+        uses: actions/checkout@v3
+
+      - uses: actions/cache@v3
+        with:
+          path: /home/runner/FLINT-${{ matrix.os }}.AppImage
+          key: ${{ matrix.os }}-appimage
+          
+      - name: Test AppImages
+        run: |
+          test -f "/home/runner/FLINT-${{ matrix.os }}.AppImage"; 
+          echo "All AppImages have been built successfully."
+          /home/runner/FLINT-${{ matrix.os }}.AppImage --appimage-extract
+          cd squashfs-root
+          cp $GITHUB_WORKSPACE/appimage-scripts/test-appimage-artifacts.sh .
+          chmod +x ./test-appimage-artifacts.sh
+          ./test-appimage-artifacts.sh
+
+  release:
+    needs: [build, test]
+    strategy:
+      matrix:
+        os: [ubuntu-20.04, ubuntu-22.04]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@master
+
+      - uses: actions/cache@v3
+        with:
+          path: /home/runner/FLINT-${{ matrix.os }}.AppImage
+          key: ${{ matrix.os }}-appimage
+
+      - name: Create dev release
+        if: ${{ inputs.devRelease }}
+        uses: ncipollo/release-action@v1
+        with: 
+          allowUpdates: true
+          name: "Dev release"
+          tag: "dev"
+          prerelease: False
+          artifacts: "/home/runner/FLINT-*.AppImage"
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # This is because releases _need_ a tag. 
+      # Please change the tag later by pushing one.
+      - name: Create production release for manual run
+        if: ${{ (!inputs.devRelease) && (startsWith(github.ref_type, 'branch')) }}
+        uses: ncipollo/release-action@v1
+        with: 
+          allowUpdates: true
+          bodyfile: .github/release.md
+          tag: "production"
+          prerelease: False
+          artifacts: "/home/runner/FLINT-*.AppImage"
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create production release with a tag
+        if: ${{ (!inputs.devRelease) && (startsWith(github.ref_type, 'tag')) }}
+        uses: ncipollo/release-action@v1
+        with: 
+          allowUpdates: true
+          bodyfile: .github/release.md
+          prerelease: False
+          artifacts: "/home/runner/FLINT-*.AppImage"
+          token: ${{ secrets.GITHUB_TOKEN }}
