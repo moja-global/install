@@ -21,14 +21,14 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [ubuntu-18.04, ubuntu-20.04, ubuntu-22.04]
+        os: [ubuntu-20.04, ubuntu-22.04]
 
     runs-on: ${{ matrix.os }}
 
     steps:
       - name: Run the AppImage script
         run: |
-          curl "https://raw.githubusercontent.com/Crystalsage/install/test/appimage-scripts/AppImage_FLINT_Build.sh" | bash  
+          curl "https://raw.githubusercontent.com/moja-global/install/main/appimage-scripts/AppImage_FLINT_Build.sh" | bash  
           mv /home/runner/tmp/FLINT/Source/build/FLINT-*.AppImage /home/runner/FLINT-${{ matrix.os }}.AppImage
       - name: Cache artifacts
         uses: actions/cache@v3
@@ -42,7 +42,7 @@ jobs:
     needs: build
     strategy:
       matrix:
-        os: [ubuntu-18.04, ubuntu-20.04, ubuntu-22.04]
+        os: [ubuntu-20.04, ubuntu-22.04]
 
     runs-on: ${{ matrix.os }}
 
@@ -58,12 +58,12 @@ jobs:
           echo "All AppImages have been built successfully."
           /home/runner/FLINT-${{ matrix.os }}.AppImage --appimage-extract
           cd squashfs-root
-          curl "https://raw.githubusercontent.com/Crystalsage/install/test/appimage-scripts/test-appimage-artifacts.sh" | bash
+          curl "https://raw.githubusercontent.com/moja-global/install/main/appimage-scripts/test-appimage-artifacts.sh" | bash
   release:
     needs: [build, test]
     strategy:
       matrix:
-        os: [ubuntu-18.04, ubuntu-20.04, ubuntu-22.04]
+        os: [ubuntu-20.04, ubuntu-22.04]
 
     runs-on: ${{ matrix.os }}
 
