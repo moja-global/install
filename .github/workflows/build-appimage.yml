@@ -26,10 +26,15 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
+      - name: Checkout the install repo
+        uses: actions/checkout@v3
+
       - name: Run the AppImage script
         run: |
-          curl "https://raw.githubusercontent.com/moja-global/install/main/appimage-scripts/AppImage_FLINT_Build.sh" | bash  
+          chmod +x $GITHUB_WORKSPACE/appimage-scripts/AppImage_FLINT_Build.sh
+          $GITHUB_WORKSPACE/appimage-scripts/AppImage_FLINT_Build.sh
           mv /home/runner/tmp/FLINT/Source/build/FLINT-*.AppImage /home/runner/FLINT-${{ matrix.os }}.AppImage
+
       - name: Cache artifacts
         uses: actions/cache@v3
         env:
@@ -47,6 +52,9 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
+      - name: Checkout the install repo
+        uses: actions/checkout@v3
+
       - uses: actions/cache@v3
         with:
           path: /home/runner/FLINT-${{ matrix.os }}.AppImage
@@ -58,7 +66,10 @@ jobs:
           echo "All AppImages have been built successfully."
           /home/runner/FLINT-${{ matrix.os }}.AppImage --appimage-extract
           cd squashfs-root
-          curl "https://raw.githubusercontent.com/moja-global/install/main/appimage-scripts/test-appimage-artifacts.sh" | bash
+          cp $GITHUB_WORKSPACE/appimage-scripts/test-appimage-artifacts.sh .
+          chmod +x ./test-appimage-artifacts.sh
+          ./test-appimage-artifacts.sh
+
   release:
     needs: [build, test]
     strategy:
